@@ -15,20 +15,29 @@
  * limitations under the License.
  */
 
-package org.apache.skywalking.oap.server.library.client.elasticsearch;
+package org.apache.skywalking.library.elasticsearch.requests.search.aggregation;
 
-import org.elasticsearch.action.update.UpdateRequest;
-import org.elasticsearch.common.xcontent.XContentBuilder;
+import com.google.common.base.Strings;
 
-public class ElasticSearchUpdateRequest extends UpdateRequest implements org.apache.skywalking.oap.server.library.client.request.UpdateRequest {
+import static com.google.common.base.Preconditions.checkArgument;
 
-    public ElasticSearchUpdateRequest(String index, String type, String id) {
-        super(index, type, id);
+public final class MinAggregationBuilder implements AggregationBuilder {
+    private final String name;
+
+    private String field;
+
+    MinAggregationBuilder(String name) {
+        this.name = name;
+    }
+
+    public MinAggregationBuilder field(String field) {
+        checkArgument(!Strings.isNullOrEmpty(field), "field cannot be blank");
+        this.field = field;
+        return this;
     }
 
     @Override
-    public ElasticSearchUpdateRequest doc(XContentBuilder source) {
-        super.doc(source);
-        return this;
+    public MinAggregation build() {
+        return new MinAggregation(name, field);
     }
 }

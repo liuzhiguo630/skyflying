@@ -19,11 +19,6 @@
 package org.apache.skywalking.oap.server.storage.plugin.elasticsearch;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -34,7 +29,6 @@ import org.apache.skywalking.oap.server.core.storage.IBatchDAO;
 import org.apache.skywalking.oap.server.core.storage.IHistoryDeleteDAO;
 import org.apache.skywalking.oap.server.core.storage.StorageBuilderFactory;
 import org.apache.skywalking.oap.server.core.storage.StorageDAO;
-import org.apache.skywalking.oap.server.core.storage.StorageException;
 import org.apache.skywalking.oap.server.core.storage.StorageModule;
 import org.apache.skywalking.oap.server.core.storage.cache.INetworkAddressAliasDAO;
 import org.apache.skywalking.oap.server.core.storage.management.UITemplateManagementDAO;
@@ -215,7 +209,7 @@ public class StorageModuleElasticsearchProvider extends ModuleProvider {
             StorageEsInstaller installer = new StorageEsInstaller(elasticSearchClient, getManager(), config);
 
             getManager().find(CoreModule.NAME).provider().getService(ModelCreator.class).addModelListener(installer);
-        } catch (StorageException | IOException | KeyStoreException | NoSuchAlgorithmException | KeyManagementException | CertificateException e) {
+        } catch (Exception e) {
             throw new ModuleStartException(e.getMessage(), e);
         }
     }
@@ -229,6 +223,7 @@ public class StorageModuleElasticsearchProvider extends ModuleProvider {
         return new String[] {CoreModule.NAME};
     }
 
+    // TODO
     public static List<IndexNameConverter> indexNameConverters(String namespace) {
         List<IndexNameConverter> converters = new ArrayList<>();
         converters.add(new NamespaceConverter(namespace));

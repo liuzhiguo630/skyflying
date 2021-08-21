@@ -20,6 +20,7 @@ package org.apache.skywalking.oap.server.storage.plugin.elasticsearch.base;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.skywalking.oap.server.core.analysis.DownSampling;
@@ -53,7 +54,7 @@ public class HistoryDeleteEsDAO extends EsDAO implements IHistoryDeleteDAO {
         }
         deadline = Long.parseLong(new DateTime().plusDays(-ttl).toString("yyyyMMdd"));
         String tableName = IndexController.INSTANCE.getTableName(model);
-        List<String> indexes = client.retrievalIndexByAliases(tableName);
+        Collection<String> indexes = client.retrievalIndexByAliases(tableName);
 
         List<String> prepareDeleteIndexes = new ArrayList<>();
         List<String> leftIndices = new ArrayList<>();
@@ -95,7 +96,7 @@ public class HistoryDeleteEsDAO extends EsDAO implements IHistoryDeleteDAO {
                 }
             }
             String tableName = IndexController.INSTANCE.getTableName(model);
-            List<String> indexes;
+            Collection<String> indexes;
             try {
                 indexes = client.retrievalIndexByAliases(tableName);
             } catch (IOException e) {

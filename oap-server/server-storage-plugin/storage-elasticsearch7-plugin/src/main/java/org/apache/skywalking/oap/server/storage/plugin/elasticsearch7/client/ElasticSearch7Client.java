@@ -38,6 +38,8 @@ import org.apache.http.HttpHost;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.skywalking.apm.util.StringUtil;
+import org.apache.skywalking.library.elasticsearch.response.Document;
+import org.apache.skywalking.library.elasticsearch.response.Documents;
 import org.apache.skywalking.oap.server.library.client.elasticsearch.ElasticSearchClient;
 import org.apache.skywalking.oap.server.library.client.elasticsearch.IndexNameConverter;
 import org.apache.skywalking.oap.server.library.client.request.InsertRequest;
@@ -49,14 +51,11 @@ import org.elasticsearch.action.admin.indices.mapping.put.PutMappingRequest;
 import org.elasticsearch.action.admin.indices.template.delete.DeleteIndexTemplateRequest;
 import org.elasticsearch.action.bulk.BackoffPolicy;
 import org.elasticsearch.action.bulk.BulkProcessor;
-import org.elasticsearch.action.bulk.BulkRequest;
-import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.action.support.ActiveShardCount;
 import org.elasticsearch.action.support.IndicesOptions;
 import org.elasticsearch.action.support.WriteRequest;
 import org.elasticsearch.action.support.master.AcknowledgedResponse;
@@ -119,18 +118,6 @@ public class ElasticSearch7Client extends ElasticSearchClient {
         indexName = formatIndexName(indexName);
 
         CreateIndexRequest request = new CreateIndexRequest(indexName);
-        CreateIndexResponse response = client.indices().create(request, RequestOptions.DEFAULT);
-        log.debug("create {} index finished, isAcknowledged: {}", indexName, response.isAcknowledged());
-        return response.isAcknowledged();
-    }
-
-    @Override
-    public boolean createIndex(String indexName, Map<String, Object> settings,
-                               Map<String, Object> mapping) throws IOException {
-        indexName = formatIndexName(indexName);
-        CreateIndexRequest request = new CreateIndexRequest(indexName);
-        request.settings(settings);
-        request.mapping(mapping);
         CreateIndexResponse response = client.indices().create(request, RequestOptions.DEFAULT);
         log.debug("create {} index finished, isAcknowledged: {}", indexName, response.isAcknowledged());
         return response.isAcknowledged();
@@ -310,7 +297,7 @@ public class ElasticSearch7Client extends ElasticSearchClient {
     }
 
     @Override
-    public GetResponse get(String indexName, String id) throws IOException {
+    public Optional<Document> get(String indexName, String id) throws IOException {
         indexName = formatIndexName(indexName);
         GetRequest request = new GetRequest(indexName, id);
         try {
@@ -324,7 +311,7 @@ public class ElasticSearch7Client extends ElasticSearchClient {
     }
 
     @Override
-    public SearchResponse ids(String indexName, String[] ids) throws IOException {
+    public Optional<Documents> ids(String indexName, String[] ids) throws IOException {
         indexName = formatIndexName(indexName);
 
         SearchRequest searchRequest = new SearchRequest(indexName);
@@ -393,27 +380,8 @@ public class ElasticSearch7Client extends ElasticSearchClient {
         return HttpStatus.SC_OK;
     }
 
-    /**
-     * @since 8.7.0 SkyWalking don't use sync bulk anymore. This method is just kept for unexpected case in the future.
-     */
-    @Deprecated
     @Override
-    public void synchronousBulk(BulkRequest request) {
-        request.timeout(TimeValue.timeValueMinutes(2));
-        request.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL);
-        request.waitForActiveShards(ActiveShardCount.ONE);
-        try {
-            int size = request.requests().size();
-            BulkResponse responses = client.bulk(request, RequestOptions.DEFAULT);
-            log.info("Synchronous bulk took time: {} millis, size: {}", responses.getTook().getMillis(), size);
-            healthChecker.health();
-        } catch (Throwable t) {
-            healthChecker.unHealth(t);
-        }
-    }
-
-    @Override
-    public BulkProcessor createBulkProcessor(int bulkActions, int flushInterval, int concurrentRequests) {
+    public org.apache.skywalking.library.elasticsearch.bulk.BulkProcessor createBulkProcessor(int bulkActions, int flushInterval, int concurrentRequests) {
         BulkProcessor.Listener listener = createBulkListener();
 
         return BulkProcessor.builder(

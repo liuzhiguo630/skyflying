@@ -33,6 +33,7 @@ public abstract class EsDAO extends AbstractDAO<ElasticSearchClient> {
         super(client);
     }
 
+    // TODO: remove
     protected XContentBuilder map2builder(Map<String, Object> objectMap) throws IOException {
         XContentBuilder builder = XContentFactory.jsonBuilder().startObject();
         for (Map.Entry<String, Object> entries: objectMap.entrySet()) {

@@ -20,11 +20,11 @@ package org.apache.skywalking.oap.server.storage.plugin.elasticsearch.base;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.skywalking.library.elasticsearch.response.Document;
 import org.apache.skywalking.oap.server.core.analysis.DownSampling;
 import org.apache.skywalking.oap.server.core.analysis.TimeBucket;
 import org.apache.skywalking.oap.server.core.analysis.metrics.Metrics;
@@ -35,8 +35,6 @@ import org.apache.skywalking.oap.server.library.client.elasticsearch.ElasticSear
 import org.apache.skywalking.oap.server.library.client.request.InsertRequest;
 import org.apache.skywalking.oap.server.library.client.request.UpdateRequest;
 import org.apache.skywalking.oap.server.storage.plugin.elasticsearch.IndicesMetadataCache;
-import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.joda.time.DateTime;
 
 import static java.util.stream.Collectors.groupingBy;
@@ -90,15 +88,12 @@ public class MetricsEsDAO extends EsDAO implements IMetricsDAO {
             String[] ids = metricList.stream()
                                      .map(item -> IndexController.INSTANCE.generateDocId(model, item.id()))
                                      .toArray(String[]::new);
-            try {
-                SearchResponse response = getClient().ids(tableName, ids);
-                for (int i = 0; i < response.getHits().getHits().length; i++) {
-                    Metrics source = storageBuilder.storage2Entity(response.getHits().getAt(i).getSourceAsMap());
+            getClient().ids(tableName, ids).ifPresent(documents -> {
+                for (final Document doc : documents) {
+                    Metrics source = storageBuilder.storage2Entity(doc.getSource());
                     result.add(source);
                 }
-            } catch (IOException e) {
-                log.error("multiGet id=" + Arrays.toString(ids) + " from " + tableName + " fails.", e);
-            }
+            });
         });
 
         return result;
@@ -106,8 +101,8 @@ public class MetricsEsDAO extends EsDAO implements IMetricsDAO {
 
     @Override
     public InsertRequest prepareBatchInsert(Model model, Metrics metrics) throws IOException {
-        XContentBuilder builder = map2builder(
-            IndexController.INSTANCE.appendMetricTableColumn(model, storageBuilder.entity2Storage(metrics)));
+        Map<String, Object> builder =
+            IndexController.INSTANCE.appendMetricTableColumn(model, storageBuilder.entity2Storage(metrics));
         String modelName = TimeSeriesUtils.writeIndexName(model, metrics.getTimeBucket());
         String id = IndexController.INSTANCE.generateDocId(model, metrics.id());
         return getClient().prepareInsert(modelName, id, builder);
@@ -115,8 +110,8 @@ public class MetricsEsDAO extends EsDAO implements IMetricsDAO {
 
     @Override
     public UpdateRequest prepareBatchUpdate(Model model, Metrics metrics) throws IOException {
-        XContentBuilder builder = map2builder(
-            IndexController.INSTANCE.appendMetricTableColumn(model, storageBuilder.entity2Storage(metrics)));
+        Map<String, Object> builder =
+            IndexController.INSTANCE.appendMetricTableColumn(model, storageBuilder.entity2Storage(metrics));
         String modelName = TimeSeriesUtils.writeIndexName(model, metrics.getTimeBucket());
         String id = IndexController.INSTANCE.generateDocId(model, metrics.id());
         return getClient().prepareUpdate(modelName, id, builder);
