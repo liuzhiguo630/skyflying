@@ -18,10 +18,6 @@
 
 package org.apache.skywalking.apm.agent.core.conf;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import org.apache.skywalking.apm.agent.core.context.trace.TraceSegment;
 import org.apache.skywalking.apm.agent.core.logging.core.LogLevel;
 import org.apache.skywalking.apm.agent.core.logging.core.LogOutput;
@@ -29,6 +25,11 @@ import org.apache.skywalking.apm.agent.core.logging.core.ResolverType;
 import org.apache.skywalking.apm.agent.core.logging.core.WriterFactory;
 import org.apache.skywalking.apm.agent.core.plugin.bytebuddy.ClassCacheMode;
 import org.apache.skywalking.apm.util.Length;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * This is the core config in sniffer agent.
@@ -65,6 +66,8 @@ public class Config {
          * Multiple values should be separated by `,`.
          */
         public static String IGNORE_SUFFIX = ".jpg,.jpeg,.js,.css,.png,.bmp,.gif,.ico,.mp3,.mp4,.html,.svg";
+
+        public static String TRACE_IGNORE_CONFIG = "";
 
         /**
          * The max number of TraceSegmentRef in a single span to keep memory cost estimatable.

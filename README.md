@@ -25,6 +25,7 @@ SkyFlying 是成都书声科技技术团队，基于 SkyWalking 演进的真正�
 6. 跨线程池自动链路关联。无需手动指定 RunnableWrapper。
 7. 支持 MySQL 端点采集执行结果数量。方便排查问题。
 8. 支持 SQL 级别的统计，而不仅限于慢 SQL。可用于精准排查 SQL 性能问题。
+9. 支持自定义 TraceId
 
 ## OAP-Server
 1. 禁用掉大量无用的分析程序，大幅度降低 ElasticSearch 开销。

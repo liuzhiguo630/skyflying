@@ -18,22 +18,19 @@
 
 package org.apache.skywalking.apm.agent.core.sampling;
 
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.skywalking.apm.agent.core.boot.BootService;
 import org.apache.skywalking.apm.agent.core.boot.DefaultImplementor;
 import org.apache.skywalking.apm.agent.core.boot.DefaultNamedThreadFactory;
-import org.apache.skywalking.apm.agent.core.boot.ServiceManager;
 import org.apache.skywalking.apm.agent.core.conf.Config;
-import org.apache.skywalking.apm.agent.core.conf.dynamic.ConfigurationDiscoveryService;
-import org.apache.skywalking.apm.agent.core.conf.dynamic.watcher.SamplingRateWatcher;
 import org.apache.skywalking.apm.agent.core.context.trace.TraceSegment;
 import org.apache.skywalking.apm.agent.core.logging.api.ILog;
 import org.apache.skywalking.apm.agent.core.logging.api.LogManager;
 import org.apache.skywalking.apm.util.RunnableWithExceptionProtection;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The <code>SamplingService</code> take charge of how to sample the {@link TraceSegment}. Every {@link TraceSegment}s
@@ -46,11 +43,7 @@ import org.apache.skywalking.apm.util.RunnableWithExceptionProtection;
 public class SamplingService implements BootService {
     private static final ILog LOGGER = LogManager.getLogger(SamplingService.class);
 
-    private volatile boolean on = false;
-    private volatile AtomicInteger samplingFactorHolder;
-    private volatile ScheduledFuture<?> scheduledFuture;
-
-    private SamplingRateWatcher samplingRateWatcher;
+    private final AtomicInteger samplingFactorHolder = new AtomicInteger(Config.Agent.SPAN_LIMIT_PER_SEGMENT);
 
     @Override
     public void prepare() {
@@ -58,11 +51,10 @@ public class SamplingService implements BootService {
 
     @Override
     public void boot() {
-        samplingRateWatcher = new SamplingRateWatcher("agent.sample_n_per_3_secs", this);
-        ServiceManager.INSTANCE.findService(ConfigurationDiscoveryService.class)
-                               .registerAgentConfigChangeWatcher(samplingRateWatcher);
-
-        handleSamplingRateChanged();
+        ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor(
+                new DefaultNamedThreadFactory("SamplingService"));
+        service.scheduleAtFixedRate(new RunnableWithExceptionProtection(
+                this::resetSamplingFactor, t -> LOGGER.error("unexpected exception.", t)), 0, 3, TimeUnit.SECONDS);
     }
 
     @Override
@@ -72,9 +64,7 @@ public class SamplingService implements BootService {
 
     @Override
     public void shutdown() {
-        if (scheduledFuture != null) {
-            scheduledFuture.cancel(true);
-        }
+
     }
 
     /**
@@ -82,13 +72,8 @@ public class SamplingService implements BootService {
      * @return true, if sampling mechanism is on, and getDefault the sampling factor successfully.
      */
     public boolean trySampling(String operationName) {
-        if (on) {
-            int factor = samplingFactorHolder.get();
-            if (factor < samplingRateWatcher.getSamplingRate()) {
-                return samplingFactorHolder.compareAndSet(factor, factor + 1);
-            } else {
-                return false;
-            }
+        if (Config.Agent.SPAN_LIMIT_PER_SEGMENT > 0) {
+            return samplingFactorHolder.getAndIncrement() < Config.Agent.SPAN_LIMIT_PER_SEGMENT;
         }
         return true;
     }
@@ -98,39 +83,10 @@ public class SamplingService implements BootService {
      * sampled, the trace beginning at local, has less chance to be sampled.
      */
     public void forceSampled() {
-        if (on) {
-            samplingFactorHolder.incrementAndGet();
-        }
+
     }
 
     private void resetSamplingFactor() {
-        samplingFactorHolder = new AtomicInteger(0);
-    }
-
-    /**
-     * Handle the samplingRate changed.
-     */
-    public void handleSamplingRateChanged() {
-        if (samplingRateWatcher.getSamplingRate() > 0) {
-            if (!on) {
-                on = true;
-                this.resetSamplingFactor();
-                ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor(
-                    new DefaultNamedThreadFactory("SamplingService"));
-                scheduledFuture = service.scheduleAtFixedRate(new RunnableWithExceptionProtection(
-                    this::resetSamplingFactor, t -> LOGGER.error("unexpected exception.", t)), 0, 3, TimeUnit.SECONDS);
-                LOGGER.debug(
-                    "Agent sampling mechanism started. Sample {} traces in 3 seconds.",
-                    samplingRateWatcher.getSamplingRate()
-                );
-            }
-        } else {
-            if (on) {
-                if (scheduledFuture != null) {
-                    scheduledFuture.cancel(true);
-                }
-                on = false;
-            }
-        }
+        samplingFactorHolder.set(0);
     }
 }

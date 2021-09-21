@@ -26,7 +26,6 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import org.apache.skywalking.apm.agent.core.boot.ServiceManager;
 import org.apache.skywalking.apm.agent.core.conf.Config;
-import org.apache.skywalking.apm.agent.core.conf.dynamic.watcher.SpanLimitWatcher;
 import org.apache.skywalking.apm.agent.core.context.ids.DistributedTraceId;
 import org.apache.skywalking.apm.agent.core.context.ids.PropagatedTraceId;
 import org.apache.skywalking.apm.agent.core.context.trace.AbstractSpan;
@@ -111,13 +110,11 @@ public class TracingContext implements AbstractTracerContext {
     @Getter(AccessLevel.PACKAGE)
     private final ExtensionContext extensionContext;
 
-    //CDS watcher
-    private final SpanLimitWatcher spanLimitWatcher;
 
     /**
      * Initialize all fields with default value.
      */
-    TracingContext(String firstOPName, SpanLimitWatcher spanLimitWatcher) {
+    TracingContext(String firstOPName) {
         this.segment = new TraceSegment();
         this.spanIdGenerator = 0;
         isRunningInAsyncMode = false;
@@ -133,7 +130,6 @@ public class TracingContext implements AbstractTracerContext {
 
         this.correlationContext = new CorrelationContext();
         this.extensionContext = new ExtensionContext();
-        this.spanLimitWatcher = spanLimitWatcher;
     }
 
     /**
@@ -546,12 +542,12 @@ public class TracingContext implements AbstractTracerContext {
     }
 
     private boolean isLimitMechanismWorking() {
-        if (spanIdGenerator >= spanLimitWatcher.getSpanLimit()) {
+        if (spanIdGenerator >= Config.Agent.SPAN_LIMIT_PER_SEGMENT) {
             long currentTimeMillis = System.currentTimeMillis();
             if (currentTimeMillis - lastWarningTimestamp > 30 * 1000) {
                 LOGGER.warn(
                     new RuntimeException("Shadow tracing context. Thread dump"),
-                    "More than {} spans required to create", spanLimitWatcher.getSpanLimit()
+                    "More than {} spans required to create", Config.Agent.SPAN_LIMIT_PER_SEGMENT
                 );
                 lastWarningTimestamp = currentTimeMillis;
             }

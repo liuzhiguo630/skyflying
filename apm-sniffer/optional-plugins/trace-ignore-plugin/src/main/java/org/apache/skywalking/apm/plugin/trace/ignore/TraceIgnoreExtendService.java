@@ -18,25 +18,28 @@
 
 package org.apache.skywalking.apm.plugin.trace.ignore;
 
+import org.apache.skywalking.apm.agent.core.boot.DefaultNamedThreadFactory;
 import org.apache.skywalking.apm.agent.core.boot.OverrideImplementor;
-import org.apache.skywalking.apm.agent.core.boot.ServiceManager;
-import org.apache.skywalking.apm.agent.core.conf.dynamic.ConfigurationDiscoveryService;
+import org.apache.skywalking.apm.agent.core.conf.Config;
 import org.apache.skywalking.apm.agent.core.logging.api.ILog;
 import org.apache.skywalking.apm.agent.core.logging.api.LogManager;
 import org.apache.skywalking.apm.agent.core.sampling.SamplingService;
-import org.apache.skywalking.apm.plugin.trace.ignore.conf.IgnoreConfig;
-import org.apache.skywalking.apm.plugin.trace.ignore.conf.IgnoreConfigInitializer;
 import org.apache.skywalking.apm.plugin.trace.ignore.matcher.FastPathMatcher;
 import org.apache.skywalking.apm.plugin.trace.ignore.matcher.TracePathMatcher;
+import org.apache.skywalking.apm.util.RunnableWithExceptionProtection;
 import org.apache.skywalking.apm.util.StringUtil;
+
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @OverrideImplementor(SamplingService.class)
 public class TraceIgnoreExtendService extends SamplingService {
     private static final ILog LOGGER = LogManager.getLogger(TraceIgnoreExtendService.class);
     private static final String PATTERN_SEPARATOR = ",";
-    private TracePathMatcher pathMatcher = new FastPathMatcher();
-    private volatile String[] patterns = new String[] {};
-    private TraceIgnorePatternWatcher traceIgnorePatternWatcher;
+    private final TracePathMatcher pathMatcher = new FastPathMatcher();
+    private String[] patterns = new String[] {};
+    private String traceIgnoreConfig = "";
 
     @Override
     public void prepare() {
@@ -45,18 +48,22 @@ public class TraceIgnoreExtendService extends SamplingService {
 
     @Override
     public void boot() {
+        loadConfig();
+
+        ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor(
+            new DefaultNamedThreadFactory("TraceIgnoreSamplingService"));
+
+        service.scheduleAtFixedRate(new RunnableWithExceptionProtection(
+            this::loadConfig, t -> LOGGER.error("unexpected exception.", t)), 1, 1, TimeUnit.MINUTES);
+
         super.boot();
+    }
 
-        IgnoreConfigInitializer.initialize();
-        if (StringUtil.isNotEmpty(IgnoreConfig.Trace.IGNORE_PATH)) {
-            patterns = IgnoreConfig.Trace.IGNORE_PATH.split(PATTERN_SEPARATOR);
+    private void loadConfig() {
+        if (!Config.Agent.TRACE_IGNORE_CONFIG.equals(traceIgnoreConfig)) {
+            traceIgnoreConfig = Config.Agent.TRACE_IGNORE_CONFIG;
+            patterns = StringUtil.trim(traceIgnoreConfig, '\'').split(PATTERN_SEPARATOR);
         }
-
-        traceIgnorePatternWatcher = new TraceIgnorePatternWatcher("agent.trace.ignore_path", this);
-        ServiceManager.INSTANCE.findService(ConfigurationDiscoveryService.class)
-                               .registerAgentConfigChangeWatcher(traceIgnorePatternWatcher);
-
-        handleTraceIgnorePatternsChanged();
     }
 
     @Override
@@ -84,13 +91,5 @@ public class TraceIgnoreExtendService extends SamplingService {
     @Override
     public void forceSampled() {
         super.forceSampled();
-    }
-
-    void handleTraceIgnorePatternsChanged() {
-        if (StringUtil.isNotBlank(traceIgnorePatternWatcher.getTraceIgnorePathPatterns())) {
-            patterns = traceIgnorePatternWatcher.getTraceIgnorePathPatterns().split(PATTERN_SEPARATOR);
-        } else {
-            patterns = new String[] {};
-        }
     }
 }

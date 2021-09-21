@@ -20,7 +20,9 @@ export SW_ROOT := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
 export SW_OUT:=${SW_ROOT}/dist
 
-SKIP_TEST?=false
+SKIP_TEST?=true
+
+IS_M1?=-Dos.detected.classifier=osx-x86_64
 
 init:
 	cd $(SW_ROOT) && git submodule update --init --recursive
@@ -28,16 +30,16 @@ init:
 .PHONY: build.all build.agent build.backend build.ui build.docker
 
 build.all:
-	cd $(SW_ROOT) && ./mvnw --batch-mode clean package -Dmaven.test.skip=$(SKIP_TEST)
+	cd $(SW_ROOT) && ./mvnw clean package -Dcheckstyle.skip -Dmaven.test.skip=$(SKIP_TEST) ${IS_M1}
 
 build.agent:
-	cd $(SW_ROOT) && ./mvnw --batch-mode clean package -Dmaven.test.skip=$(SKIP_TEST) -Pagent,dist
+	cd $(SW_ROOT) && ./mvnw clean package -Dcheckstyle.skip -Dmaven.test.skip=$(SKIP_TEST) ${IS_M1} -Pagent,dist
 
 build.backend:
-	cd $(SW_ROOT) && ./mvnw --batch-mode clean package -Dmaven.test.skip=$(SKIP_TEST) -Pbackend,dist
+	cd $(SW_ROOT) && ./mvnw clean package -Dcheckstyle.skip -Dmaven.test.skip=$(SKIP_TEST) ${IS_M1} -Pbackend,dist
 
 build.ui:
-	cd $(SW_ROOT) && ./mvnw --batch-mode clean package -Dmaven.test.skip=$(SKIP_TEST) -Pui,dist
+	cd $(SW_ROOT) && ./mvnw clean package -Dcheckstyle.skip -Dmaven.test.skip=$(SKIP_TEST) ${IS_M1} -Pui,dist
 
 DOCKER_BUILD_TOP:=${SW_OUT}/docker_build
 
@@ -45,7 +47,7 @@ HUB?=skywalking
 
 TAG?=latest
 
-ES_VERSION?=es6
+ES_VERSION?=es7
 
 .SECONDEXPANSION: #allow $@ to be used in dependency list
 

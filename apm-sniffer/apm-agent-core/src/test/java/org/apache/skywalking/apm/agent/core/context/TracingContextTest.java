@@ -20,7 +20,6 @@ package org.apache.skywalking.apm.agent.core.context;
 
 import org.apache.skywalking.apm.agent.core.boot.ServiceManager;
 import org.apache.skywalking.apm.agent.core.conf.Config;
-import org.apache.skywalking.apm.agent.core.conf.dynamic.watcher.SpanLimitWatcher;
 import org.apache.skywalking.apm.agent.core.context.trace.AbstractSpan;
 import org.apache.skywalking.apm.agent.core.context.trace.TraceSegment;
 import org.apache.skywalking.apm.agent.core.test.tools.AgentServiceRule;
@@ -33,8 +32,6 @@ import org.junit.Test;
 public class TracingContextTest {
     @Rule
     public AgentServiceRule serviceRule = new AgentServiceRule();
-
-    private final SpanLimitWatcher spanLimitWatcher = new SpanLimitWatcher("agent.span_limit_per_segment");
 
     @BeforeClass
     public static void beforeClass() {
@@ -58,7 +55,7 @@ public class TracingContextTest {
         };
         TracingContext.ListenerManager.add(listener);
         try {
-            TracingContext tracingContext = new TracingContext("/url", spanLimitWatcher);
+            TracingContext tracingContext = new TracingContext("/url");
             AbstractSpan span = tracingContext.createEntrySpan("/url");
 
             for (int i = 0; i < 10; i++) {
