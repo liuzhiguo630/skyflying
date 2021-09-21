@@ -25,6 +25,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
+import org.apache.skywalking.apm.agent.core.conf.ConfigCenterService;
 import org.apache.skywalking.apm.agent.core.logging.api.ILog;
 import org.apache.skywalking.apm.agent.core.logging.api.LogManager;
 import org.apache.skywalking.apm.agent.core.plugin.loader.AgentClassLoader;
@@ -60,6 +61,14 @@ public enum ServiceManager {
         Map<Class, BootService> bootedServices = new LinkedHashMap<>();
         List<BootService> allServices = new LinkedList<>();
         load(allServices);
+        // 保证 ConfigCenterService 首先被加载
+        for (final BootService bootService : allServices) {
+            if (bootService.getClass().getSimpleName().equals(ConfigCenterService.class.getSimpleName())) {
+                allServices.remove(bootService);
+                allServices.add(0, bootService);
+                break;
+            }
+        }
         for (final BootService bootService : allServices) {
             Class<? extends BootService> bootServiceClass = bootService.getClass();
             boolean isDefaultImplementor = bootServiceClass.isAnnotationPresent(DefaultImplementor.class);

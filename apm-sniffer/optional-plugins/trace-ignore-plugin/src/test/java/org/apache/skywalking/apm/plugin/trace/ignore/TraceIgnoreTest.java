@@ -20,11 +20,10 @@ package org.apache.skywalking.apm.plugin.trace.ignore;
 
 import java.util.Properties;
 import org.apache.skywalking.apm.agent.core.boot.ServiceManager;
+import org.apache.skywalking.apm.agent.core.conf.Config;
 import org.apache.skywalking.apm.agent.core.sampling.SamplingService;
 import org.apache.skywalking.apm.agent.test.tools.AgentServiceRule;
-import org.apache.skywalking.apm.plugin.trace.ignore.conf.IgnoreConfig;
 import org.apache.skywalking.apm.util.ConfigInitializer;
-import org.apache.skywalking.apm.util.PropertyPlaceholderHelper;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -64,10 +63,8 @@ public class TraceIgnoreTest {
     @Test
     public void testTraceIgnoreConfigOverridingFromSystemEnv() throws IllegalAccessException {
         Properties properties = new Properties();
-        properties.put("trace.ignore_path", "${SW_AGENT_TRACE_IGNORE_PATH:/path/eureka/**}");
-        properties.put("trace.ignore_path", PropertyPlaceholderHelper.INSTANCE.replacePlaceholders(
-            (String) properties.get("trace.ignore_path"), properties));
-        ConfigInitializer.initialize(properties, IgnoreConfig.class);
-        assertThat(IgnoreConfig.Trace.IGNORE_PATH, is("path_test"));
+        properties.put("agent.trace.ignore.config", "path_test");
+        ConfigInitializer.initialize(properties, Config.class);
+        assertThat(Config.Agent.TRACE_IGNORE_CONFIG, is("path_test"));
     }
 }

@@ -25,9 +25,13 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -63,6 +67,9 @@ public class AgentClassLoader extends ClassLoader {
     private List<Jar> allJars;
     private ReentrantLock jarScanLock = new ReentrantLock();
 
+    public static final Map<AgentClassLoader, Set<Class>> AGENT_CLASS_LOADER_SET_HASH_MAP = new ConcurrentHashMap<AgentClassLoader, Set<Class>>(2);
+
+
     public static AgentClassLoader getDefault() {
         return DEFAULT_LOADER;
     }
@@ -87,6 +94,7 @@ public class AgentClassLoader extends ClassLoader {
         File agentDictionary = AgentPackagePath.getPath();
         classpath = new LinkedList<>();
         Config.Plugin.MOUNT.forEach(mountFolder -> classpath.add(new File(agentDictionary, mountFolder)));
+        AGENT_CLASS_LOADER_SET_HASH_MAP.put(this, new HashSet<>());
     }
 
     @Override
@@ -163,7 +171,9 @@ public class AgentClassLoader extends ClassLoader {
             // Set up the plugin config when loaded by class loader at the first time.
             // Agent class loader just loaded limited classes in the plugin jar(s), so the cost of this
             // isAssignableFrom would be also very limited.
-            SnifferConfigInitializer.initializeConfig(pluginConfig.root());
+            Class<?> pluginConfigRoot = pluginConfig.root();
+            AGENT_CLASS_LOADER_SET_HASH_MAP.get(this).add(pluginConfigRoot);
+            SnifferConfigInitializer.initializeConfig(pluginConfigRoot);
         }
 
         return loadedClass;
