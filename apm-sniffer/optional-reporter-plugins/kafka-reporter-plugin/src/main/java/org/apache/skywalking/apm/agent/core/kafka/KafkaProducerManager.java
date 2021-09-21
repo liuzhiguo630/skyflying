@@ -21,16 +21,15 @@ package org.apache.skywalking.apm.agent.core.kafka;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
-
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.DescribeTopicsResult;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -62,7 +61,9 @@ public class KafkaProducerManager implements BootService, Runnable {
 
     private volatile KafkaProducer<String, Bytes> producer;
 
-    private ScheduledFuture<?> bootProducerFuture;
+    private Map<String, String> producerConfig;
+
+    private String bootstrapServers;
 
     @Override
     public void prepare() {
@@ -70,17 +71,17 @@ public class KafkaProducerManager implements BootService, Runnable {
 
     @Override
     public void boot() {
-        bootProducerFuture = Executors.newSingleThreadScheduledExecutor(
-                new DefaultNamedThreadFactory("kafkaProducerInitThread")
+        Executors.newSingleThreadScheduledExecutor(
+            new DefaultNamedThreadFactory("kafkaProducerInitThread")
         ).scheduleAtFixedRate(new RunnableWithExceptionProtection(
-                this,
-                t -> LOGGER.error("unexpected exception.", t)
-        ), 0, 120, TimeUnit.SECONDS);
+            this,
+            t -> LOGGER.error("unexpected exception.", t)
+        ), 0, 60, TimeUnit.SECONDS);
     }
 
     String formatTopicNameThenRegister(String topic) {
         String topicName = StringUtil.isBlank(KafkaReporterPluginConfig.Plugin.Kafka.NAMESPACE) ? topic
-                : KafkaReporterPluginConfig.Plugin.Kafka.NAMESPACE + "-" + topic;
+            : KafkaReporterPluginConfig.Plugin.Kafka.NAMESPACE + "-" + topic;
         topics.add(topicName);
         return topicName;
     }
@@ -99,44 +100,60 @@ public class KafkaProducerManager implements BootService, Runnable {
     public void run() {
         Thread.currentThread().setContextClassLoader(AgentClassLoader.getDefault());
 
-        Properties properties = new Properties();
-        properties.setProperty(
-            ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KafkaReporterPluginConfig.Plugin.Kafka.BOOTSTRAP_SERVERS);
-        KafkaReporterPluginConfig.Plugin.Kafka.PRODUCER_CONFIG.forEach(properties::setProperty);
+        if (producer == null || producerConfig != KafkaReporterPluginConfig.Plugin.Kafka.PRODUCER_CONFIG ||
+            !bootstrapServers.equals(KafkaReporterPluginConfig.Plugin.Kafka.BOOTSTRAP_SERVERS)) {
 
-        try (AdminClient adminClient = AdminClient.create(properties)) {
-            DescribeTopicsResult topicsResult = adminClient.describeTopics(topics);
-            Set<String> topics = topicsResult.values().entrySet().stream()
-                    .map(entry -> {
-                        try {
-                            entry.getValue().get(
-                                    KafkaReporterPluginConfig.Plugin.Kafka.GET_TOPIC_TIMEOUT,
-                                    TimeUnit.SECONDS
-                            );
-                            return null;
-                        } catch (InterruptedException | ExecutionException | TimeoutException e) {
-                            LOGGER.error(e, "Get KAFKA topic:{} error.", entry.getKey());
-                        }
-                        return entry.getKey();
-                    })
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-    
-            if (!topics.isEmpty()) {
-                LOGGER.warn("kafka topics {} is not exist, connect to kafka cluster abort", topics);
-                return;
+            producerConfig = KafkaReporterPluginConfig.Plugin.Kafka.PRODUCER_CONFIG;
+            bootstrapServers = KafkaReporterPluginConfig.Plugin.Kafka.BOOTSTRAP_SERVERS;
+
+            Properties properties = new Properties();
+            properties.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+            producerConfig.forEach(properties::setProperty);
+
+            try (AdminClient adminClient = AdminClient.create(properties)) {
+                DescribeTopicsResult topicsResult = adminClient.describeTopics(topics);
+                Set<String> notExistTopics = topicsResult.values().entrySet().stream()
+                                                         .map(entry -> {
+                                                             try {
+                                                                 entry.getValue().get(
+                                                                     KafkaReporterPluginConfig.Plugin.Kafka.GET_TOPIC_TIMEOUT,
+                                                                     TimeUnit.SECONDS
+                                                                 );
+                                                                 return null;
+                                                             } catch (InterruptedException | ExecutionException | TimeoutException e) {
+                                                                 LOGGER.error(
+                                                                     e, "Get KAFKA topic:{} error.", entry.getKey());
+                                                             }
+                                                             return entry.getKey();
+                                                         })
+                                                         .filter(Objects::nonNull)
+                                                         .collect(Collectors.toSet());
+
+                if (!notExistTopics.isEmpty()) {
+                    LOGGER.warn("kafka topics {} is not exist, connect to kafka cluster abort", notExistTopics);
+                    return;
+                }
+
+                try {
+                    KafkaProducer<String, Bytes> newProducer = new KafkaProducer<>(
+                        properties, new StringSerializer(), new BytesSerializer());
+                    if (this.producer != null) {
+                        producer.flush();
+                        producer.close();
+                    }
+                    this.producer = newProducer;
+                } catch (Exception e) {
+                    LOGGER.error(
+                        e, "connect to kafka cluster '{}' failed",
+                        KafkaReporterPluginConfig.Plugin.Kafka.BOOTSTRAP_SERVERS
+                    );
+                    return;
+                }
+                // notify listeners to send data if no exception been throw
+                notifyListeners(KafkaConnectionStatus.CONNECTED);
             }
-    
-            try {
-                producer = new KafkaProducer<>(properties, new StringSerializer(), new BytesSerializer());
-            } catch (Exception e) {
-                LOGGER.error(e, "connect to kafka cluster '{}' failed", KafkaReporterPluginConfig.Plugin.Kafka.BOOTSTRAP_SERVERS);
-                return;
-            }
-            //notify listeners to send data if no exception been throw
-            notifyListeners(KafkaConnectionStatus.CONNECTED);
-            bootProducerFuture.cancel(true);
         }
+
     }
 
     private void notifyListeners(KafkaConnectionStatus status) {
