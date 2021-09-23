@@ -46,3 +46,9 @@ Apollo 中的配置是通过 HTTP 定时拉取（每分钟）的，所以配置�
 
 ### 不兼容的配置
 1. `trace.ignore_path` 改为 `agent.trace_ignore_config`。配置内容格式不变，见 [Support custom trace ignore](https://skywalking.apache.org/docs/main/v8.7.0/en/setup/service-agent/java-agent/agent-optional-plugins/trace-ignore-plugin/)
+
+### 使用 Kafka 作为 Reporter（推荐）
+Kafka 比默认的 gRPC 协议 Reporter 高效可靠得多。SkyFlying 基于一些历史经验，对 Kafka 做了动态配置变更，即发现 bootstrap 或 producerConfig 变更后，会创建新的 producer 并销毁旧的。producerConfig 推荐配置如下：
+1. `plugin.kafka.producer_config[max.block.ms] = 1000`
+2. `plugin.kafka.producer_config[linger.ms]=1000`
+3. `plugin.kafka.producer_config[batch.size]=512000`
