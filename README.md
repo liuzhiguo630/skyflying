@@ -1,14 +1,15 @@
 JoJo SkyFlying
 ==========
-本项目基于 Apache SkyWalking 二次开发，需要读者对 SkyWalking 有大概的了解，源项目地址 [SkyWalking](https://github.com/apache/skywalking)
+本项目基于 Apache SkyWalking 二次开发，100% 兼容 SkyWalking。旨在提供一个更轻量级更便捷好用的 APM 系统。
+
+SkyWalking 项目地址 [SkyWalking](https://github.com/apache/skywalking)
 
 # 简介
 SkyFlying 是成都书声科技技术团队，基于 SkyWalking 演进的真正大规模可用的 APM 系统。我们解决了大量实践中发现的问题，并融入了我们对 APM 系统的理解。
 
-
 # 优势
-据统计有 85% 的公司在使用 SkyWalking 时，止步在了预发环境，上线之后出问题也匆匆下线。原因和问题很多不一一列举，不过我总结只有一点，就是本身这个产品并不是生产可用的。
-另一种情况是，花了很多预算在 SkyWalking 上，最后却没有收获多少价值，顶多能看到链路了。SkyWalking 本身并没有深入挖掘过采集数据的价值。
+大部分公司在使用 SkyWalking 时，止步在了预发环境，上线之后出问题也匆匆下线。原因和问题很多不一一列举，不过我总结只有一点，就是本身这个产品并不是生产可用的。
+另一种情况是，花了很多预算在 SkyWalking 上，最后却没有收获多少价值。SkyWalking 本身并没有深入挖掘过采集数据的价值。
 
 究其原因，SkyWalking 的贡献者中，没有真正多少人在现实生活中大规模运维过这套系统，所以在很多问题上想当然，或者压根意识不到存在问题。
 
@@ -31,3 +32,17 @@ SkyFlying 是成都书声科技技术团队，基于 SkyWalking 演进的真正�
 1. 禁用掉大量无用的分析程序，大幅度降低 ElasticSearch 开销。
 2. 链路索引 Segment 支持按小时拆分，大幅提高写入速度。
 3. 支持多数据源，链路数据到 ElasticSearch，统计数据到 InfluxDB。
+
+# 使用说明
+## Java Agent
+### 使用 Apollo 作为配置中心
+1. 将 `/optional-plugins/config-server-apollo-plugin-8.7.0.jar` 放入 `plugins` 目录下
+2. 指定 apollo 接入地址: 支持直接通过启动参数`-Dapollo.meta=apolloMetaUrl`，或通过参数`-Dskywalking.plugin.apollo.namespace=apolloMetaUrl`. 推荐前者。 
+3. 指定 appId: 支持通过启动参数 `-Dapp.id=appId`, 或使用 skywalking 本身的 Agent Name(启动时将环境变量或启动参数中添加 `-DSW_AGENT_NAME=xApp`)
+4. 指定 namespace: 默认为 `skyflying`。需要提前在 Apollo 后台创建名为 `skyflying` 的公共 Namespace（不需要每个服务都引入 namespace 即可共享配置）。可通过启动参数 `-Dskywalking.plugin.apollo.namespace=newSkyflyingNamespace` 自定义 namespace。
+5. 启动后验证，查看 skywalking-api.log 中是否提示 `load config from apollo succeed`。
+
+Apollo 中的配置是通过 HTTP 定时拉取（每分钟）的，所以配置生效会存在延迟。在 Apollo 中的配置格式，与 `agent.config` 保持一致，具体配置见[Setup java agent](`https://skywalking.apache.org/docs/main/v8.7.0/en/setup/service-agent/java-agent/readme/#table-of-agent-configuration-properties`)
+
+### 不兼容的配置
+1. `trace.ignore_path` 改为 `agent.trace_ignore_config`。配置内容格式不变，见 [Support custom trace ignore](https://skywalking.apache.org/docs/main/v8.7.0/en/setup/service-agent/java-agent/agent-optional-plugins/trace-ignore-plugin/)

@@ -47,6 +47,7 @@ public class ApolloConfigCenterService extends ConfigCenterService {
         if (properties != null) {
             overrideConfigs(properties);
         }
+        LOGGER.info("load config from apollo succeed");
     }
 
     private Properties loadProperties() {
@@ -56,7 +57,7 @@ public class ApolloConfigCenterService extends ConfigCenterService {
                 throw new IllegalArgumentException("apollo.meta can not be empty" + apolloMeta);
             }
 
-            String appId = ApolloConfiguration.Plugin.Apollo.APP_ID;
+            String appId = System.getProperty("app.id", ApolloConfiguration.Plugin.Apollo.APP_ID);
             if (StringUtil.isEmpty(appId)) {
                 throw new IllegalArgumentException("apollo.appId can not be empty" + appId);
             }

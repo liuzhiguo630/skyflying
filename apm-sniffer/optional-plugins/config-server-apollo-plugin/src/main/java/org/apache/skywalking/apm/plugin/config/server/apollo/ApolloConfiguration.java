@@ -15,7 +15,7 @@ public class ApolloConfiguration {
             public static String APP_ID = Config.Agent.SERVICE_NAME;
 
             // apollo namespace. 独立出 namespace 来方便管理。建议创建出公共配置，每个项目只需在个性化某些配置时引入该 namespace。
-            public static String NAMESPACE = "skywalking";
+            public static String NAMESPACE = "skyflying";
 
             // apollo cluster。
             public static String CLUSTER = "default";
